@@ -83,6 +83,7 @@ allconnect (char const *name, char const *port, int socktype)
 			}
 			if(socks[i].revents & POLLOUT){
 				sock = socks[i].fd;
+				printf("connection %d connected first.\n", i);
 				goto DONE;				
 			}
 		}
