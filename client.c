@@ -11,84 +11,126 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-
+#include <fcntl.h>
 #include <arpa/inet.h>
+#include <poll.h>
 
-#define PORT "3490" // the port client will be connecting to 
+#define PORT "3490"		// the port client will be connecting to
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once 
+#define MAXDATASIZE 100		// max number of bytes we can get at once
 
 // get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa)
+void *
+get_in_addr (struct sockaddr *sa)
 {
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
+	if (sa->sa_family == AF_INET) {
+		return &(((struct sockaddr_in *) sa)->sin_addr);
+	}
 
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+	return &(((struct sockaddr_in6 *) sa)->sin6_addr);
 }
 
-int main(int argc, char *argv[])
+
+int
+allconnect (char const *name, char const *port, int socktype)
 {
-    int sockfd, numbytes;  
-    char buf[MAXDATASIZE];
-    struct addrinfo hints, *servinfo, *p;
-    int rv;
-    char s[INET6_ADDRSTRLEN];
+	struct pollfd socks[100];
+	int i, rv, sock, count = 0;
+	struct addrinfo hints, *servinfo, *p;
+	char s[INET6_ADDRSTRLEN];
 
-    if (argc != 2) {
-        fprintf(stderr,"usage: client hostname\n");
-        exit(1);
-    }
+	memset (&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = socktype;
 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+	if ((rv = getaddrinfo (name, port, &hints, &servinfo)) != 0) {
+		fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rv));
+		return -1;
+	}
 
-    if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
-    }
+	// loop through all the results and connect to the first we can
+	for (p = servinfo; p != NULL; p = p->ai_next) {
 
-    // loop through all the results and connect to the first we can
-    for(p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            perror("client: socket");
-            continue;
-        }
+		sock = socket (p->ai_family, p->ai_socktype, p->ai_protocol);
+		if (sock == -1) {
+			perror ("client: socket");
+			continue;
+		}
 
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("client: connect");
-            continue;
-        }
+		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) | O_NONBLOCK);
+		inet_ntop (p->ai_family, get_in_addr ((struct sockaddr *) p->ai_addr), s, sizeof s);
+		printf ("client: connecting to %s...\n", s);
 
-        break;
-    }
+		connect (sock, p->ai_addr, p->ai_addrlen);
+		socks[count].fd = sock;
+		socks[count].events = POLLIN|POLLOUT;
+		socks[count].revents = 0;
+		++count;			
+	}
 
-    if (p == NULL) {
-        fprintf(stderr, "client: failed to connect\n");
-        return 2;
-    }
+	freeaddrinfo (servinfo);	// all done with this structure
 
-    inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
-            s, sizeof s);
-    printf("client: connecting to %s\n", s);
+	sock = -1;
+	while(1){
+		rv = poll(socks, count, -1);
+		if(rv == -1)
+			return -1;
 
-    freeaddrinfo(servinfo); // all done with this structure
+		for(i = 0; i < count; ++i){
+			if(socks[i].revents == POLLHUP || socks[i].revents == POLLERR){
+				socks[i].events = 0;
+				close(socks[i].fd);
+			}
+			if(socks[i].revents & POLLOUT){
+				sock = socks[i].fd;
+				goto DONE;				
+			}
+		}
+	}
+DONE:
+	for(i = 0; i < count; ++i){
+		if(socks[i].fd != sock){
+			close(socks[i].fd);	
+		}
+	}
 
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) {
-        perror("recv");
-        exit(1);
-    }
+	if(sock >= 0){
+		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
+	}
 
-    buf[numbytes] = '\0';
+	return sock;
 
-    printf("client: received '%s'\n",buf);
-
-    close(sockfd);
-
-    return 0;
 }
 
+int
+main (int argc, char *argv[])
+{
+	int sockfd, numbytes;
+	char buf[MAXDATASIZE];
+	int rv;
+
+	if (argc != 2) {
+		fprintf (stderr, "usage: client hostname\n");
+		exit (1);
+	}
+	sockfd = allconnect (argv[1], PORT, SOCK_STREAM);
+
+	if (sockfd == -1) {
+		fprintf (stderr, "client: failed to connect\n");
+		return 2;
+	}
+
+
+	if ((numbytes = recv (sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
+		perror ("recv");
+		exit (1);
+	}
+
+	buf[numbytes] = '\0';
+
+	printf ("client: received '%s'\n", buf);
+
+	close (sockfd);
+
+	return 0;
+}
