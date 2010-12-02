@@ -114,11 +114,21 @@ int main(void)
         printf("server: got connection from %s\n", s);
 
         if (!fork()) { // this is the child process
-            close(sockfd); // child doesn't need the listener
-            if (send(new_fd, "Hello, world!", 13, 0) == -1)
-                perror("send");
-            close(new_fd);
-            exit(0);
+                struct linger linger = {1, 1};
+		char buffer[4000];
+
+        	close(sockfd); // child doesn't need the listener
+
+		read(new_fd, buffer, sizeof(buffer));
+                shutdown(new_fd, SHUT_RD);
+                setsockopt(new_fd, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger));
+
+		if (send(new_fd, "Hello, world!", 13, 0) == -1)
+                	perror("send");
+
+		shutdown(new_fd, SHUT_WR);
+		close(new_fd);
+		exit(0);
         }
         close(new_fd);  // parent doesn't need this
     }
