@@ -68,6 +68,10 @@ int main(void)
 
 	sockfd = all_sock(PORT);
 
+	if(sockfd < 0){
+		perror("sockfd");
+	}
+
     if (listen(sockfd, BACKLOG) == -1) {
         perror("listen");
         exit(1);
@@ -106,7 +110,8 @@ int main(void)
                 shutdown(new_fd, SHUT_RD);
                 setsockopt(new_fd, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger));
 
-		if (send(new_fd, "Hello, world!", 13, 0) == -1)
+		sprintf(buffer, "Hi there %s!", s);
+		if (send(new_fd, buffer, strlen(buffer), 0) == -1)
                 	perror("send");
 
 		shutdown(new_fd, SHUT_WR);
