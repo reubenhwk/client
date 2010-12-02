@@ -121,6 +121,7 @@ main (int argc, char *argv[])
 		return 2;
 	}
 
+	shutdown(sockfd, SHUT_WR);
 
 	if ((numbytes = recv (sockfd, buf, MAXDATASIZE - 1, 0)) == -1) {
 		perror ("recv");
