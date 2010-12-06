@@ -15,9 +15,6 @@
 #include <arpa/inet.h>
 #include <poll.h>
 
-#define PORT "80"		// the port client will be connecting to
-
-#define MAXDATASIZE 100		// max number of bytes we can get at once
 
 // get sockaddr, IPv4 or IPv6:
 void *
@@ -58,6 +55,7 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 			continue;
 		}
 
+		/* Set non-blocking on this socket so we can poll it. */
 		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) | O_NONBLOCK);
 		inet_ntop (p->ai_family, get_in_addr ((struct sockaddr *) p->ai_addr), s, sizeof s);
 		printf ("client: connecting to %s...\n", s);
@@ -66,10 +64,10 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 		socks[count].fd = sock;
 		socks[count].events = POLLIN|POLLOUT;
 		socks[count].revents = 0;
-		++count;			
+		++count;
 	}
 
-	freeaddrinfo (servinfo);	// all done with this structure
+	freeaddrinfo (servinfo);
 
 	sock = -1;
 	while(failed < count){
@@ -109,6 +107,7 @@ DONE:
 		}
 	}
 
+	/* Unset non-blocking on this socket. */
 	if(sock >= 0){
 		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
 	}
@@ -116,6 +115,9 @@ DONE:
 	return sock;
 
 }
+
+#define PORT "80"		// the port client will be connecting to
+#define MAXDATASIZE 100		// max number of bytes we can get at once
 
 int
 main (int argc, char *argv[])
