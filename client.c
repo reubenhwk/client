@@ -32,8 +32,9 @@ int
 allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 {
 	struct pollfd socks[100];
-	int i, rv, sock, failed = 0, count = 0;
+	int i, rv, sock, spent = 0, failed = 0, count = 0;
 	struct addrinfo hints, *servinfo, *p;
+	struct timeval now, start;
 	char s[INET6_ADDRSTRLEN];
 
 	memset (socks, 0, sizeof(socks));
@@ -62,18 +63,20 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 
 		connect (sock, p->ai_addr, p->ai_addrlen);
 		socks[count].fd = sock;
-		socks[count].events = POLLIN|POLLOUT;
+		socks[count].events = POLLOUT;
 		socks[count].revents = 0;
 		++count;
 	}
 
 	freeaddrinfo (servinfo);
 
+	gettimeofday(&start, 0);
 	sock = -1;
-	while(failed < count){
-		rv = poll(socks, count, timeout_ms);
-		fprintf(stderr, "poll returned %d.\n", rv);
-		if(rv <= 0)
+	while(failed < count && timeout_ms - spent > 0){
+		int wt = timeout_ms - spent;
+		rv = poll(socks, count, wt < 250 ? wt : 250);
+
+		if(rv < 0)
 			goto DONE;
 
 		for(i = 0; i < count; ++i){
@@ -91,8 +94,17 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 				goto DONE;
 			}
 		}
+
+		gettimeofday(&now, 0);
+		now.tv_sec -= 1;
+		now.tv_usec += 1000000;
+		spent = 1000 * (now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec) / 1000;
 	}
 DONE:
+	gettimeofday(&now, 0);
+	now.tv_sec -= 1;
+	now.tv_usec += 1000000;
+	spent = 1000 * (now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec) / 1000;
 	printf("results:\n");
 	for(i = 0; i < count; ++i){
 		if(socks[i].fd == -1){
@@ -106,6 +118,7 @@ DONE:
 			printf("\tconnection %d closed.\n", i);
 		}
 	}
+	printf("wait time: %gs\n", spent / 1000.0);
 
 	/* Unset non-blocking on this socket. */
 	if(sock >= 0){
