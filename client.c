@@ -79,24 +79,33 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 			goto DONE;
 
 		for(i = 0; i < count; ++i){
-			if(socks[i].revents == POLLHUP || socks[i].revents == POLLERR){
+			if(socks[i].revents & ~POLLOUT){
+				close(socks[i].fd);
+				socks[i].fd = -1;
 				socks[i].events = 0;
 				socks[i].revents = 0;
-				printf("socket %d failed.\n", i);
+				printf("connection %d failed.\n", i);
 				++failed;
 			}
 			if(socks[i].revents & POLLOUT){
 				sock = socks[i].fd;
-				printf("connection %d connected first.\n", i);
+				printf("connection %d connected.\n", i);
 				goto DONE;
 			}
 		}
 	}
 DONE:
+	printf("results:\n");
 	for(i = 0; i < count; ++i){
-		if(socks[i].fd != sock && socks[i].fd != -1){
+		if(socks[i].fd == -1){
+			printf("\tconnection %d failed.\n", i);
+		}
+		else if(socks[i].fd == sock){
+			printf("\tconnection %d connected.\n", i);
+		}
+		else{
 			close(socks[i].fd);
-			printf("socket %d too late.\n", i);
+			printf("\tconnection %d closed.\n", i);
 		}
 	}
 
@@ -115,11 +124,11 @@ main (int argc, char *argv[])
 	char buf[MAXDATASIZE];
 	int rv;
 
-	if (argc != 2) {
-		fprintf (stderr, "usage: client hostname\n");
+	if (argc < 2) {
+		fprintf (stderr, "usage: client hostname [timeout_ms]\n");
 		exit (1);
 	}
-	sockfd = allconnect (argv[1], PORT, SOCK_STREAM, 1000);
+	sockfd = allconnect (argv[1], PORT, SOCK_STREAM, argc >= 3 ? atoi(argv[2]) : 1000);
 
 	if (sockfd == -1) {
 		fprintf (stderr, "client: failed to connect\n");
