@@ -15,7 +15,7 @@
 #include <arpa/inet.h>
 #include <poll.h>
 
-#define PORT "3490"		// the port client will be connecting to
+#define PORT "80"		// the port client will be connecting to
 
 #define MAXDATASIZE 100		// max number of bytes we can get at once
 
@@ -32,13 +32,14 @@ get_in_addr (struct sockaddr *sa)
 
 
 int
-allconnect (char const *name, char const *port, int socktype)
+allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 {
 	struct pollfd socks[100];
-	int i, rv, sock, count = 0;
+	int i, rv, sock, failed = 0, count = 0;
 	struct addrinfo hints, *servinfo, *p;
 	char s[INET6_ADDRSTRLEN];
 
+	memset (socks, 0, sizeof(socks));
 	memset (&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = socktype;
@@ -71,27 +72,30 @@ allconnect (char const *name, char const *port, int socktype)
 	freeaddrinfo (servinfo);	// all done with this structure
 
 	sock = -1;
-	while(1){
-		rv = poll(socks, count, -1);
-		if(rv == -1)
-			return -1;
+	while(failed < count){
+		rv = poll(socks, count, timeout_ms);
+		if(rv <= 0)
+			goto DONE;
 
 		for(i = 0; i < count; ++i){
 			if(socks[i].revents == POLLHUP || socks[i].revents == POLLERR){
 				socks[i].events = 0;
-				close(socks[i].fd);
+				socks[i].revents = 0;
+				printf("socket %d failed.\n", i);
+				++failed;
 			}
 			if(socks[i].revents & POLLOUT){
 				sock = socks[i].fd;
 				printf("connection %d connected first.\n", i);
-				goto DONE;				
+				goto DONE;
 			}
 		}
 	}
 DONE:
 	for(i = 0; i < count; ++i){
-		if(socks[i].fd != sock){
-			close(socks[i].fd);	
+		if(socks[i].fd != sock && socks[i].fd != -1){
+			close(socks[i].fd);
+			printf("socket %d too late.\n", i);
 		}
 	}
 
@@ -114,7 +118,7 @@ main (int argc, char *argv[])
 		fprintf (stderr, "usage: client hostname\n");
 		exit (1);
 	}
-	sockfd = allconnect (argv[1], PORT, SOCK_STREAM);
+	sockfd = allconnect (argv[1], PORT, SOCK_STREAM, 100);
 
 	if (sockfd == -1) {
 		fprintf (stderr, "client: failed to connect\n");
