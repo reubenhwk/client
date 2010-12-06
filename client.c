@@ -75,12 +75,13 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 
 	gettimeofday(&start, 0);
 	sock = -1;
-	while(failed < count && timeout_ms - spent > 0){
-		int wt = timeout_ms - spent;
-		rv = poll(socks, count, wt < 250 ? wt : 250);
+	if(count) do {
+		rv = poll(socks, count, timeout_ms - spent);
 
-		if(rv < 0)
+		if(rv < 0){
+			perror ("client: poll");
 			goto DONE;
+		}
 
 		for(i = 0; i < count; ++i){
 			if(socks[i].revents & ~POLLOUT){
@@ -102,18 +103,22 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 		now.tv_sec -= 1;
 		now.tv_usec += 1000000;
 		spent = 1000 * (now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec) / 1000;
-	}
+
+	} while(failed < count && timeout_ms - spent > 0);
+
 DONE:
 	gettimeofday(&now, 0);
 	now.tv_sec -= 1;
 	now.tv_usec += 1000000;
 	spent = 1000 * (now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec) / 1000;
+
 	printf("results:\n");
 	for(i = 0; i < count; ++i){
 		if(socks[i].fd == -1){
 			printf("\tconnection %d failed.\n", i);
 		}
 		else if(socks[i].fd == sock){
+			fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
 			printf("\tconnection %d connected.\n", i);
 		}
 		else{
@@ -123,17 +128,12 @@ DONE:
 	}
 	printf("wait time: %gs\n", spent / 1000.0);
 
-	/* Unset non-blocking on this socket. */
-	if(sock >= 0){
-		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
-	}
-
 	return sock;
 
 }
 
 #define PORT "80"		// the port client will be connecting to
-#define MAXDATASIZE 100		// max number of bytes we can get at once
+#define MAXDATASIZE 1000	// max number of bytes we can get at once
 
 int
 main (int argc, char *argv[])
