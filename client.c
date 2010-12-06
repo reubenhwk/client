@@ -15,6 +15,9 @@
 #include <arpa/inet.h>
 #include <poll.h>
 
+#ifndef countof
+# define countof(x) (sizeof(x)/sizeof(x[0]))
+#endif
 
 // get sockaddr, IPv4 or IPv6:
 void *
@@ -31,7 +34,7 @@ get_in_addr (struct sockaddr *sa)
 int
 allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 {
-	struct pollfd socks[100];
+	struct pollfd socks[20];
 	int i, rv, sock, spent = 0, failed = 0, count = 0;
 	struct addrinfo hints, *servinfo, *p;
 	struct timeval now, start;
@@ -48,7 +51,7 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 	}
 
 	// loop through all the results and connect to the first we can
-	for (p = servinfo; p != NULL; p = p->ai_next) {
+	for (p = servinfo; p != NULL && count < countof(socks); p = p->ai_next) {
 
 		sock = socket (p->ai_family, p->ai_socktype, p->ai_protocol);
 		if (sock == -1) {
