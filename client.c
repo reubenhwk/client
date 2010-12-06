@@ -74,6 +74,7 @@ allconnect (char const *name, char const *port, int socktype, int timeout_ms)
 	sock = -1;
 	while(failed < count){
 		rv = poll(socks, count, timeout_ms);
+		fprintf(stderr, "poll returned %d.\n", rv);
 		if(rv <= 0)
 			goto DONE;
 
@@ -118,7 +119,7 @@ main (int argc, char *argv[])
 		fprintf (stderr, "usage: client hostname\n");
 		exit (1);
 	}
-	sockfd = allconnect (argv[1], PORT, SOCK_STREAM, 100);
+	sockfd = allconnect (argv[1], PORT, SOCK_STREAM, 1000);
 
 	if (sockfd == -1) {
 		fprintf (stderr, "client: failed to connect\n");
