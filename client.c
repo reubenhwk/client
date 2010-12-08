@@ -32,7 +32,7 @@ get_in_addr (struct sockaddr *sa)
 
 
 int
-allconnect (char const *name, char const *port, int socktype, int timeout_ms)
+ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 {
 	struct pollfd socks[20];
 	int i, rv, sock, spent = 0, failed = 0, count = 0;
@@ -146,7 +146,7 @@ main (int argc, char *argv[])
 		fprintf (stderr, "usage: client hostname [timeout_ms]\n");
 		exit (1);
 	}
-	sockfd = allconnect (argv[1], PORT, SOCK_STREAM, argc >= 3 ? atoi(argv[2]) : 1000);
+	sockfd = ezsocket (argv[1], PORT, SOCK_STREAM, argc >= 3 ? atoi(argv[2]) : 1000);
 
 	if (sockfd == -1) {
 		fprintf (stderr, "client: failed to connect\n");
