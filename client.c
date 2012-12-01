@@ -2,6 +2,7 @@
 ** client.c -- a stream socket client demo
 */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -36,22 +37,30 @@ ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 {
 	struct pollfd socks[20];
 	int i, rv, sock, spent = 0, failed = 0, count = 0;
-	struct addrinfo hints, *servinfo, *p;
 	struct timeval now, start;
 	char s[INET6_ADDRSTRLEN];
+	struct addrinfo hints, *p;
+	struct gaicb sgaicb;
+	struct gaicb * gaicb[1];
 
-	memset (socks, 0, sizeof(socks));
 	memset (&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = socktype;
 
-	if ((rv = getaddrinfo (name, port, &hints, &servinfo)) != 0) {
-		fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rv));
+	gaicb[0] = &sgaicb;
+	gaicb[0]->ar_name = name;
+	gaicb[0]->ar_service = port;
+	gaicb[0]->ar_request = &hints;
+	gaicb[0]->ar_result = 0;
+
+	if ((rv = getaddrinfo_a (GAI_WAIT, gaicb, 1, 0)) != 0) {
+		fprintf (stderr, "getaddrinfo_a: %s\n", gai_strerror (rv));
 		return -1;
 	}
 
 	// loop through all the results and connect to the first we can
-	for (p = servinfo; p != NULL && count < countof(socks); p = p->ai_next) {
+	memset (socks, 0, sizeof(socks));
+	for (p = gaicb[0]->ar_result; p != NULL && count < countof(socks); p = p->ai_next) {
 
 		sock = socket (p->ai_family, p->ai_socktype, p->ai_protocol);
 		if (sock == -1) {
@@ -71,7 +80,8 @@ ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 		++count;
 	}
 
-	freeaddrinfo (servinfo);
+	if (gaicb[0]->ar_result);
+		freeaddrinfo (gaicb[0]->ar_result);
 
 	gettimeofday(&start, 0);
 	sock = -1;
