@@ -21,8 +21,7 @@
 #endif
 
 // get sockaddr, IPv4 or IPv6:
-void *
-get_in_addr (struct sockaddr *sa)
+void * get_in_addr (struct sockaddr *sa)
 {
 	if (sa->sa_family == AF_INET) {
 		return &(((struct sockaddr_in *) sa)->sin_addr);
@@ -32,8 +31,7 @@ get_in_addr (struct sockaddr *sa)
 }
 
 
-int
-ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
+int ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 {
 	struct pollfd socks[20];
 	int i, rv, sock, spent = 0, failed = 0, count = 0;
@@ -145,8 +143,7 @@ DONE:
 #define PORT "80"		// the port client will be connecting to
 #define MAXDATASIZE 1000	// max number of bytes we can get at once
 
-int
-main (int argc, char *argv[])
+int main (int argc, char *argv[])
 {
 	int sockfd, numbytes;
 	char buf[MAXDATASIZE];
