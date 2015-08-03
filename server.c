@@ -50,7 +50,10 @@ all_sock (unsigned short port)
 
         setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (one));
 
-        bind (sock, (struct sockaddr *) &saddr, sizeof (saddr));
+        if (0 != bind (sock, (struct sockaddr *) &saddr, sizeof (saddr))) {
+		perror("bind");
+		exit(-1);
+	}
         listen (sock, 15);
 
         return sock;
