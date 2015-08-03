@@ -47,6 +47,7 @@ all_sock (unsigned short port)
 
         memset (&saddr, 0, sizeof (saddr));
         saddr.sin6_port = htons (port);
+	saddr.sin6_family = AF_INET6;
 
         setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (one));
 
