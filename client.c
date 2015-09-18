@@ -106,9 +106,19 @@ int ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 				++failed;
 			}
 			if(socks[i].revents & POLLOUT){
-				sock = socks[i].fd;
-				printf("connection %d connected.\n", i);
-				goto DONE;
+				int optval = -1;
+				socklen_t optlen = sizeof(optval);
+				int rc = getsockopt(socks[i].fd, SOL_SOCKET, SO_ERROR, &optval, &optlen);
+				if (0 == optval) {
+					sock = socks[i].fd;
+					printf("connection %d connected.\n", i);
+					goto DONE;
+				}
+				close(socks[i].fd);
+				socks[i].fd = -1;
+				socks[i].events = 0;
+				socks[i].revents = 0;
+				++failed;
 			}
 		}
 
