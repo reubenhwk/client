@@ -71,7 +71,11 @@ int ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 		inet_ntop (p->ai_family, get_in_addr ((struct sockaddr *) p->ai_addr), s, sizeof s);
 		printf ("client: connecting to %s...\n", s);
 
-		connect (sock, p->ai_addr, p->ai_addrlen);
+		if (-1 == connect (sock, p->ai_addr, p->ai_addrlen) && EINPROGRESS != errno) {
+			perror ("client: connect");
+			close(sock);
+			continue;
+		}
 		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
 		socks[count].fd = sock;
 		socks[count].events = POLLOUT;
