@@ -72,6 +72,7 @@ int ezsocket (char const *name, char const *port, int socktype, int timeout_ms)
 		printf ("client: connecting to %s...\n", s);
 
 		connect (sock, p->ai_addr, p->ai_addrlen);
+		fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
 		socks[count].fd = sock;
 		socks[count].events = POLLOUT;
 		socks[count].revents = 0;
@@ -126,7 +127,6 @@ DONE:
 			printf("\tconnection %d failed.\n", i);
 		}
 		else if(socks[i].fd == sock){
-			fcntl (sock, F_SETFL, fcntl (sock, F_GETFL, 0) & ~O_NONBLOCK);
 			printf("\tconnection %d connected.\n", i);
 		}
 		else{
