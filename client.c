@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #define PORT "80"		// the port client will be connecting to
-#define MAXDATASIZE 1000	// max number of bytes we can get at once
+#define MAXDATASIZE (16*1024)	// max number of bytes we can get at once
 
 static int ezsocket(char const * addrstr, char const * port)
 {
@@ -52,7 +52,7 @@ static int ezsocket(char const * addrstr, char const * port)
 	double millis = total.tv_sec * 1000 + total.tv_nsec / 1000000.0;
 
 	printf("%u.%09u\n", (unsigned)total.tv_sec, (unsigned)total.tv_nsec);
-	printf("%.1f ms\n", millis);
+	printf("%.3f ms\n", millis);
 
 	return sock;
 cleanup:
@@ -78,6 +78,8 @@ int main (int argc, char *argv[])
 		return 2;
 	}
 
+	struct timespec start = {};
+	clock_gettime(CLOCK_MONOTONIC, &start);
 	char const * request = "GET / HTTP/1.1\n\n";
 	write(sockfd, request, strlen(request));
 
@@ -89,8 +91,23 @@ int main (int argc, char *argv[])
 	}
 
 	buf[numbytes] = '\0';
+	struct timespec end = {};
+	clock_gettime(CLOCK_MONOTONIC, &end);
 
 	printf ("client: received '%s'\n", buf);
+	struct timespec total = {
+		end.tv_sec - start.tv_sec -1,
+		end.tv_nsec - start.tv_nsec + 1000000000,
+	};
+	if (total.tv_nsec >= 1000000000) {
+		total.tv_sec += 1;
+		total.tv_nsec -= 1000000000;
+	}
+	double millis = total.tv_sec * 1000 + total.tv_nsec / 1000000.0;
+
+	printf("%u.%09u\n", (unsigned)total.tv_sec, (unsigned)total.tv_nsec);
+	printf("%.3f ms\n", millis);
+
 
 	close (sockfd);
 
