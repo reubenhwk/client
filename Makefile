@@ -3,11 +3,14 @@
 
 default: client server
 
+CPPFLAGS=-DPORT=\"8081\"
+CFLAGS=-std=gnu99 -O3
+
 clean:
 	rm -f client server
 
 client: client.c
-	gcc -std=gnu99 -g client.c -o client
+	gcc $(CPPFLAGS) $(CFLAGS) client.c -o client
 
 server: server.c
-	gcc -std=gnu99 -g server.c -o server
+	gcc $(CPPFLAGS) $(CFLAGS) server.c -o server

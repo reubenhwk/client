@@ -15,8 +15,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define PORT 80  // the port users will be connecting to
-
 #define BACKLOG 10	 // how many pending connections queue will hold
 
 void sigchld_handler(int s)
@@ -35,29 +33,28 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 int
-all_sock (unsigned short port)
+all_sock (char const * port)
 {
-		struct sockaddr_in6 saddr;
-		int sock = socket (AF_INET6, SOCK_STREAM, 0);
-		int const one = 1;
+	int sock = socket (AF_INET6, SOCK_STREAM, 0);
 
-		if (sock < 0) {
-				exit (1);
-		}
+	if (sock < 0) {
+		exit (1);
+	}
 
-		memset (&saddr, 0, sizeof (saddr));
-		saddr.sin6_port = htons (port);
+	struct sockaddr_in6 saddr = {};
+	saddr.sin6_port = htons(atoi(port));
 	saddr.sin6_family = AF_INET6;
 
-		setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (one));
+	setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, (int[]){1}, sizeof(int));
 
-		if (0 != bind (sock, (struct sockaddr *) &saddr, sizeof (saddr))) {
+	if (0 != bind (sock, (struct sockaddr *)&saddr, sizeof(saddr))) {
 		perror("bind");
 		exit(-1);
 	}
-		listen (sock, 15);
 
-		return sock;
+	listen (sock, 15);
+
+	return sock;
 }
 
 
@@ -68,11 +65,10 @@ int main(void)
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
 	struct sigaction sa;
-	char s[INET6_ADDRSTRLEN];
 
 	sockfd = all_sock(PORT);
 
-	if (sockfd < 0){
+	if (sockfd < 0) {
 		perror("sockfd");
 	}
 
@@ -92,37 +88,35 @@ int main(void)
 	printf("server: waiting for connections...\n");
 
 	while(1) {  // main accept() loop
-		sin_size = sizeof their_addr;
+		sin_size = sizeof(their_addr);
 		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
 		if (new_fd == -1) {
 			perror("accept");
 			continue;
 		}
 
+		if (!fork()) { // this is the child process
+			close(sockfd); // child doesn't need the listener
+			char buffer[4*1024];
+
+			while (read(new_fd, buffer, sizeof(buffer)) > 0) {
+				write(new_fd, (char[1]){0}, 1);
+			}
+
+			close(new_fd);
+
+			exit(0);
+		}
+
+		close(new_fd);  // parent doesn't need this
+#if 0
+		char s[INET6_ADDRSTRLEN];
 		inet_ntop(their_addr.ss_family,
 			get_in_addr((struct sockaddr *)&their_addr),
-			s, sizeof s);
+			s, sizeof(s));
+
 		printf("server: got connection from %s\n", s);
-
-		if (!fork()) { // this is the child process
-				struct linger linger = {1, 1};
-		char buffer[4000];
-
-		close(sockfd); // child doesn't need the listener
-
-		read(new_fd, buffer, sizeof(buffer));
-				shutdown(new_fd, SHUT_RD);
-				setsockopt(new_fd, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger));
-
-		sprintf(buffer, "Hi there %s!", s);
-		if (send(new_fd, buffer, strlen(buffer), 0) == -1)
-			perror("send");
-
-		shutdown(new_fd, SHUT_WR);
-		close(new_fd);
-		exit(0);
-		}
-		close(new_fd);  // parent doesn't need this
+#endif
 	}
 
 	return 0;
