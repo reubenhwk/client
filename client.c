@@ -1,22 +1,11 @@
-/*
-** client.c -- a stream socket client demo
-*/
 
 #include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-
-#define MAXDATASIZE (16*1024)	// max number of bytes we can get at once
 
 typedef struct timespec stopwatch_t;
 
@@ -97,7 +86,7 @@ int main (int argc, char *argv[])
 			sockfd = ezsocket (argv[a+1], PORT);
 			if (sockfd == -1) {
 				fprintf (stderr, "client: failed to connect\n");
-				continue;
+				exit(1);
 			}
 			ms = get_ms_time(timer);
 			conn_times[a] += ms;
@@ -114,11 +103,11 @@ int main (int argc, char *argv[])
 			timer = start_ms_timer();
 			if (1 != write(sockfd, (char[]){0}, 1)) {
 				perror ("write");
-				exit (1);
+				exit(1);
 			}
 			if (-1 == read(sockfd, (char[1]){}, 1)) {
 				perror ("read");
-				exit (1);
+				exit(1);
 			}
 			ms = get_ms_time(timer);
 			rt_times[a] += ms;
@@ -127,8 +116,10 @@ int main (int argc, char *argv[])
 
 	}
 
-	printf("% 4.3f, % 4.3f ms average connection time\n", conn_times[0], conn_times[1]);
-	printf("% 4.3f, % 4.3f ms average round trip time\n", rt_times[0], rt_times[1]);
+	printf("% 4.3f, % 4.3f ms average connection time (% 4.3f ms diff)\n", conn_times[0], conn_times[1],
+		conn_times[1] - conn_times[0]);
+	printf("% 4.3f, % 4.3f ms average round trip time (% 4.3f ms diff)\n", rt_times[0], rt_times[1],
+		rt_times[1] - rt_times[0]);
 
 	return 0;
 }
